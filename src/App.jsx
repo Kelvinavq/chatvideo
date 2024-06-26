@@ -25,6 +25,9 @@ function App() {
       if (myVideo.current) {
         myVideo.current.srcObject = stream;
       }
+      console.log('Stream obtained:', stream);
+    }).catch((error) => {
+      console.error('Error accessing media devices:', error);
     });
 
     socket.on("me", (id) => {
@@ -41,12 +44,19 @@ function App() {
 
   const callUser = (id) => {
     if (stream) {
+      console.log('Calling user with ID:', id);
       const peer = new Peer({
         initiator: true,
         trickle: false,
         stream: stream
       });
+  
+      peer.on("error", (err) => {
+        console.error('Error with Peer connection:', err);
+      });
+  
       peer.on("signal", (data) => {
+        console.log('Generated signal data:', data);
         socket.emit("callUser", {
           userToCall: id,
           signalData: data,
@@ -54,37 +64,51 @@ function App() {
           name: name
         });
       });
+  
       peer.on("stream", (stream) => {
+        console.log('Received remote stream:', stream);
         if (userVideo.current) {
           userVideo.current.srcObject = stream;
         }
       });
+  
       socket.on("callAccepted", (signal) => {
+        console.log('Call accepted with signal:', signal);
         setCallAccepted(true);
         peer.signal(signal);
       });
-
+  
       connectionRef.current = peer;
     } else {
       console.error("Stream is not available");
     }
   };
+  
+  
+  
 
   const answerCall = () => {
     if (stream) {
+      console.log('Answering call from:', caller);
       setCallAccepted(true);
       const peer = new Peer({
         initiator: false,
         trickle: false,
         stream: stream
       });
+
       peer.on("signal", (data) => {
         socket.emit("answerCall", { signal: data, to: caller });
       });
+
       peer.on("stream", (stream) => {
         if (userVideo.current) {
           userVideo.current.srcObject = stream;
         }
+      });
+
+      peer.on("error", (err) => {
+        console.error('Error with Peer connection:', err);
       });
 
       peer.signal(callerSignal);
@@ -154,7 +178,7 @@ function App() {
               </button>
             ) : (
               <button color="primary" aria-label="call" onClick={() => callUser(idToCall)}>
-            phone
+                phone
               </button>
             )}
           </div>
