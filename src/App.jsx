@@ -8,6 +8,7 @@ const socket = io.connect("https://chatvideo-6b5z.onrender.com");
 function App() {
   const [me, setMe] = useState("");
   const [stream, setStream] = useState();
+  const [screenStream, setScreenStream] = useState();
   const [receivingCall, setReceivingCall] = useState(false);
   const [caller, setCaller] = useState("");
   const [callerSignal, setCallerSignal] = useState();
@@ -51,12 +52,7 @@ function App() {
         stream: stream
       });
   
-      peer.on("error", (err) => {
-        console.error('Error with Peer connection:', err);
-      });
-  
       peer.on("signal", (data) => {
-        console.log('Generated signal data:', data);
         socket.emit("callUser", {
           userToCall: id,
           signalData: data,
@@ -66,14 +62,16 @@ function App() {
       });
   
       peer.on("stream", (stream) => {
-        console.log('Received remote stream:', stream);
         if (userVideo.current) {
           userVideo.current.srcObject = stream;
         }
       });
   
+      peer.on("error", (err) => {
+        console.error('Error with Peer connection:', err);
+      });
+  
       socket.on("callAccepted", (signal) => {
-        console.log('Call accepted with signal:', signal);
         setCallAccepted(true);
         peer.signal(signal);
       });
@@ -83,9 +81,6 @@ function App() {
       console.error("Stream is not available");
     }
   };
-  
-  
-  
 
   const answerCall = () => {
     if (stream) {
@@ -123,13 +118,41 @@ function App() {
     if (connectionRef.current) {
       connectionRef.current.destroy();
     }
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+    }
   };
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(me);
+      alert("ID copied to clipboard");
     } catch (err) {
       console.error("Failed to copy: ", err);
+    }
+  };
+
+  const shareScreen = async () => {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ cursor: true });
+      setScreenStream(screenStream);
+      if (connectionRef.current) {
+        const videoTrack = screenStream.getVideoTracks()[0];
+        connectionRef.current.replaceTrack(
+          connectionRef.current.streams[0].getVideoTracks()[0],
+          videoTrack,
+          connectionRef.current.streams[0]
+        );
+        screenStream.getVideoTracks()[0].onended = () => {
+          connectionRef.current.replaceTrack(
+            videoTrack,
+            stream.getVideoTracks()[0],
+            connectionRef.current.streams[0]
+          );
+        };
+      }
+    } catch (error) {
+      console.error("Error sharing screen: ", error);
     }
   };
 
@@ -162,7 +185,7 @@ function App() {
             onClick={copyToClipboard}
             style={{ marginBottom: "2rem" }}
           >
-            Copy ID
+            Copiar ID
           </button>
           <input
             id="filled-basic"
@@ -174,21 +197,24 @@ function App() {
           <div className="call-button">
             {callAccepted && !callEnded ? (
               <button variant="contained" color="secondary" onClick={leaveCall}>
-                End Call
+                Finalizar
               </button>
             ) : (
               <button color="primary" aria-label="call" onClick={() => callUser(idToCall)}>
-                phone
+                Llamar
               </button>
             )}
           </div>
+          <button onClick={shareScreen}>
+            Compartir pantalla
+          </button>
         </div>
         <div>
           {receivingCall && !callAccepted ? (
             <div className="caller">
-              <h1>{name} is calling...</h1>
+              <h1>{name} está llamando...</h1>
               <button variant="contained" color="primary" onClick={answerCall}>
-                Answer
+                Contestar
               </button>
             </div>
           ) : null}
