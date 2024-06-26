@@ -21,15 +21,19 @@ function App() {
   const connectionRef = useRef();
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      setStream(stream);
-      if (myVideo.current) {
-        myVideo.current.srcObject = stream;
-      }
-      console.log('Stream obtained:', stream);
-    }).catch((error) => {
-      console.error('Error accessing media devices:', error);
-    });
+    const getUserMedia = navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    
+    getUserMedia
+      .then((stream) => {
+        setStream(stream);
+        if (myVideo.current) {
+          myVideo.current.srcObject = stream;
+        }
+        console.log('Stream obtained:', stream);
+      })
+      .catch((error) => {
+        console.error('Error accessing media devices:', error);
+      });
 
     socket.on("me", (id) => {
       setMe(id);
@@ -41,6 +45,12 @@ function App() {
       setName(data.name);
       setCallerSignal(data.signal);
     });
+
+    return () => {
+      getUserMedia.then((stream) => {
+        stream.getTracks().forEach(track => track.stop());
+      });
+    };
   }, []);
 
   const callUser = (id) => {
@@ -156,6 +166,8 @@ function App() {
     }
   };
 
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   return (
     <>
       <h1 style={{ textAlign: "center", color: "#fff" }}>VIDEOCONFERENCIA</h1>
@@ -212,14 +224,15 @@ function App() {
         <div>
           {receivingCall && !callAccepted ? (
             <div className="caller">
-              <h1>{name} está llamando...</h1>
+              <h1>{name} is calling...</h1>
               <button variant="contained" color="primary" onClick={answerCall}>
-                Contestar
+                Responder
               </button>
             </div>
           ) : null}
         </div>
       </div>
+      {isSafari && <p>Nota: Safari no sirve.</p>}
     </>
   );
 }
